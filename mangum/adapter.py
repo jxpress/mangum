@@ -88,7 +88,7 @@ class Mangum:
             http_method = event["requestContext"]["http"]["method"]
         else:
             source_ip = event["requestContext"].get("identity", {}).get("sourceIp")
-            multi_value_query_string_params = event["multiValueQueryStringParameters"]
+            multi_value_query_string_params = event.get("multiValueQueryStringParameters") or event.get("queryStringParameters")
             query_string = (
                 urllib.parse.urlencode(
                     multi_value_query_string_params, doseq=True
