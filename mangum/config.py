@@ -35,11 +35,10 @@ def get_logger(log_level: str) -> logging.Logger:
 
 
 def get_server_and_headers(event: dict) -> typing.Tuple:  # pragma: no cover
-    headers = (
-        {k.lower(): v for k, v in event.get("headers").items()}  # type: ignore
-        if event.get("headers")
-        else {}
-    )
+    if event.get("headers"):
+        headers = {k.lower(): v for k, v in event.get("headers").items()}  # type: ignore
+    else:
+        headers = {k.lower(): v[0] for k, v in event.get("multiValueHeaders").items()}  # type: ignore
 
     server_name = headers.get("host", "mangum")
     if ":" not in server_name:
@@ -121,6 +120,40 @@ class Config:
         }
 
         return scope
+
+
+    def make_alb_scope(self, event: dict, context: dict) -> Scope:
+        query_string_params = event.get("multiValueQueryStringParameters") or event.get("queryStringParameters")
+        query_string = (
+            urllib.parse.urlencode(
+                query_string_params, doseq=True
+            )
+            if query_string_params
+            else ""
+        )
+        query_string = urllib.parse.unquote(query_string).encode()
+
+        server, headers = get_server_and_headers(event)
+
+        scope = {
+            "type": "http",
+            "http_version": "1.1",
+            "method": event["httpMethod"],
+            "headers": [[k.encode(), v.encode()] for k, v in headers.items()],
+            "path": urllib.parse.unquote(event["path"]),
+            "raw_path": None,
+            "root_path": "",
+            "scheme": headers.get("x-forwarded-proto", "https"),
+            "query_string": query_string,
+            "server": server,
+            "client": (None, 0),
+            "asgi": {"version": "3.0"},
+            "aws.event": event,
+            "aws.context": context,
+        }
+
+        return scope
+
 
     def make_websocket_scope(self, event: dict) -> Scope:
         server, headers = get_server_and_headers(event)

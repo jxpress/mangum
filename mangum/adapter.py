@@ -85,6 +85,8 @@ class Mangum:
 
             if "eventType" in event["requestContext"]:
                 response = self.handle_ws(event, context)
+            elif "elb" in event["requestContext"]:
+                response = self.handle_alb(event, context)
             else:
                 response = self.handle_http(event, context)
 
@@ -95,6 +97,26 @@ class Mangum:
         self.config.logger.info("HTTP event received.")
 
         scope = self.config.make_http_scope(event, context)
+        is_binary = event.get("isBase64Encoded", False)
+        body = event.get("body") or b""
+        if is_binary:
+            body = base64.b64decode(body)
+        elif not isinstance(body, bytes):
+            body = body.encode()
+
+        asgi_cycle = HTTPCycle(
+            scope,
+            body=body,
+            text_mime_types=self.config.text_mime_types,  # type: ignore
+        )
+        response = asgi_cycle(self.app)
+
+        return response
+
+    def handle_alb(self, event: dict, context: dict) -> dict:
+        self.config.logger.info("ALB event received.")
+
+        scope = self.config.make_alb_scope(event, context)
         is_binary = event.get("isBase64Encoded", False)
         body = event.get("body") or b""
         if is_binary:
