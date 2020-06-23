@@ -118,6 +118,9 @@ class HTTPCycle:
             self.response["headers"] = {
                 k.decode().lower(): v.decode() for k, v in message.get("headers", [])
             }
+            self.response["multiValueHeaders"] = {
+                k.decode().lower(): [v.decode()] for k, v in message.get("headers", [])
+            }
             self.state = HTTPCycleState.RESPONSE
 
         elif (
